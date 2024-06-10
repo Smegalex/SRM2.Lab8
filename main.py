@@ -1,4 +1,5 @@
 from sympy.abc import x
+from lab6 import gauss_jordan, separate_matrix_and_vector, zeidel_method
 
 
 def create_x_range(x_start: float, x_end: float, h: float) -> list:
@@ -44,7 +45,7 @@ def create_x_range(x_start: float, x_end: float, h: float) -> list:
 
 def find_limit(limit: float | dict, k: int, h: float, N: int) -> dict | float:
     if (isinstance(limit, float)):
-        return {f"y{k}": limit}
+        return {f"y{k}": 1, "=": limit}
 
     returnable = {}
 
@@ -60,26 +61,48 @@ def find_limit(limit: float | dict, k: int, h: float, N: int) -> dict | float:
     return returnable
 
 
+def dict_equation_to_list(equation: dict, N: int) -> list:
+    returnable = [0]*(N+2)
+    for key, value in equation.items():
+        if key == "=":
+            returnable[-1] = value
+            continue
+        key = int(key.replace("y", ""))
+        returnable[key] = value
+    return returnable
+
+
 def form_system(inside_pattern: dict, left_limit: dict | float, right_limit: dict | float, x_range: list, N: int) -> list:
     system = []
     substitutions = {}
 
-    if isinstance(left_limit, float):
-        substitutions["y0"] = left_limit 
+    if len(list(left_limit.values())) == 1:
+        substitutions["y0"] = list(left_limit.values())[0]
+        system.append(left_limit)
     else:
         system.append(left_limit)
-    if isinstance(right_limit, float):
-        substitutions[f"y{N}"] = right_limit
+    if len(list(right_limit.values())) == 1:
+        substitutions[f"y{N}"] = list(right_limit.values())[0]
+        system.append(right_limit)
     else:
         system.append(right_limit)
 
-    
-    for i in range(N+1):
-        new_equation = {}
-        
+    pattern_order = ["yk-1", "yk", "yk+1"]
+    for i in range(1, N):
+        new_equation = {"=": inside_pattern["="]}
+        for j, k in enumerate(range(i-1, i+2)):
+            # if f"y{k}" in substitutions:
+            #     new_equation["="] += -1*substitutions[f"y{k}"]*inside_pattern[pattern_order[j]]
+            # else:
+            inside = inside_pattern[pattern_order[j]]
+            if (not isinstance(inside, float)):
+                new_equation[f"y{k}"] = inside.subs(x, x_range[i])
+            else:
+                new_equation[f"y{k}"] = inside
 
-    
-
+        system.append(new_equation)
+    system = [dict_equation_to_list(i, N) for i in system]
+    return system
 
 
 def limit_difference(equation: dict, left_limit: float | dict, right_limit: float | dict, x_left: float, x_right: float, h: float):
@@ -89,7 +112,7 @@ def limit_difference(equation: dict, left_limit: float | dict, right_limit: floa
 
     # Заміна похідних різницевими аналогами
     inside_ys["yk+1"] += equation["y''"]/(h**2)
-    inside_ys["yk"] += -2*equation["y''"](1/(h**2))
+    inside_ys["yk"] += -2*equation["y''"]*(1/(h**2))
     inside_ys["yk-1"] += equation["y''"]/(h**2)
 
     inside_ys["yk+1"] += equation["y'"]/(h*2)
@@ -102,6 +125,10 @@ def limit_difference(equation: dict, left_limit: float | dict, right_limit: floa
     left_limit = find_limit(left_limit, 0, h, N)
     right_limit = find_limit(right_limit, N, h, N)
 
+    system = form_system(inside_ys, left_limit, right_limit, x_range, N)
+    matrix, vector = separate_matrix_and_vector(system)
+    return gauss_jordan(matrix, vector)
+
 
 if __name__ == "__main__":
     equation = {"y''": 1, "y'": -0.6, "y": -x, "=": 1.2}
@@ -110,5 +137,14 @@ if __name__ == "__main__":
     h = 0.2
     x_left = 1.9
     x_right = 2.9
-    limit_difference(equation, left_limit, x_left, x_right, right_limit, h)
-    # print(create_x_range(x_left, x_right, h))
+    solutions = limit_difference(
+        equation, left_limit, right_limit,  x_left, x_right, h)
+    print("Маємо крайову задачу:")
+    print(equation["y''"], 'y" + (', equation["y'"],
+          ")y' + (", equation["y"], ")y = ", equation["="])
+    print(left_limit["y'"], "y'(", x_left, ") + (",
+          left_limit["y"], ")y(", x_left, ") = ", left_limit['='])
+    print("y(", x_right, ") = ", right_limit)
+    print(f"h = {h}\n")
+    print("Розв'язки:")
+    print(solutions)

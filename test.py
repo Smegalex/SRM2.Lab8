@@ -1,1 +1,2 @@
-print(float(input())%1)
+returnable = [None]*5
+print(returnable)
